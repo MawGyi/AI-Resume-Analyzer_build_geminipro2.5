@@ -1,0 +1,5 @@
+{
+  "name": "AI Resume Analyzer_geminipro2.5",
+  "description": "An intelligent application that analyzes your resume using the Gemini API. Get instant, actionable feedback on your resume's content, formatting, and keywords to improve your job application success.",
+  "requestFramePermissions": []
+}
