@@ -1,6 +1,9 @@
-import React from 'react';
+
+import React, { useState } from 'react';
 import type { AnalysisResult } from '../types';
 import Loader from './Loader';
+import ClipboardIcon from './icons/ClipboardIcon';
+import CheckIcon from './icons/CheckIcon';
 
 interface AnalysisDisplayProps {
   result: AnalysisResult | null;
@@ -8,11 +11,14 @@ interface AnalysisDisplayProps {
   error: string | null;
 }
 
-const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ReactNode }> = ({ title, children, icon }) => (
+const AnalysisCard: React.FC<{ title: string; children: React.ReactNode; icon: React.ReactNode; actions?: React.ReactNode }> = ({ title, children, icon, actions }) => (
   <div className="bg-white/5 p-5 rounded-xl border border-white/10 backdrop-blur-sm">
-    <div className="flex items-center gap-3 mb-3">
-      <div className="bg-blue-500/10 p-2 rounded-lg">{icon}</div>
-      <h3 className="text-xl font-semibold text-gray-100">{title}</h3>
+    <div className="flex items-center justify-between gap-3 mb-3">
+      <div className="flex items-center gap-3">
+        <div className="bg-blue-500/10 p-2 rounded-lg">{icon}</div>
+        <h3 className="text-xl font-semibold text-gray-100">{title}</h3>
+      </div>
+      {actions && <div className="flex-shrink-0">{actions}</div>}
     </div>
     <div className="text-gray-300 space-y-2">{children}</div>
   </div>
@@ -59,6 +65,19 @@ const ScoreCircle: React.FC<{ score: number }> = ({ score }) => {
 };
 
 const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, isLoading, error }) => {
+  const [isSummaryCopied, setIsSummaryCopied] = useState(false);
+
+  const handleCopySummary = async () => {
+    if (!result?.summary) return;
+    try {
+        await navigator.clipboard.writeText(result.summary);
+        setIsSummaryCopied(true);
+        setTimeout(() => setIsSummaryCopied(false), 2000);
+    } catch (err) {
+        console.error('Failed to copy text: ', err);
+    }
+  };
+
   if (isLoading) {
     return <Loader />;
   }
@@ -98,7 +117,19 @@ const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, isLoading, er
           <h3 className="text-xl font-semibold text-gray-100 mb-2">Overall Score</h3>
           <ScoreCircle score={result.overallScore} />
         </div>
-        <AnalysisCard title="AI Summary" icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}>
+        <AnalysisCard 
+            title="AI Summary" 
+            icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
+            actions={
+              <button
+                onClick={handleCopySummary}
+                className="p-2 rounded-md hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+                aria-label="Copy summary to clipboard"
+              >
+                {isSummaryCopied ? <CheckIcon className="w-5 h-5 text-green-400" /> : <ClipboardIcon className="w-5 h-5 text-gray-400" />}
+              </button>
+            }
+        >
           <p>{result.summary}</p>
         </AnalysisCard>
       </div>
@@ -113,7 +144,6 @@ const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, isLoading, er
         <ul className="list-disc list-inside space-y-2">
             {result.areasForImprovement.map((item, index) => <li key={index}>{item}</li>)}
         </ul>
-      {/* FIX: Corrected typo in closing tag from AanalysisCard to AnalysisCard */}
       </AnalysisCard>
       
       <AnalysisCard title="Suggested Keywords" icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" /></svg>}>
@@ -126,7 +156,6 @@ const AnalysisDisplay: React.FC<AnalysisDisplayProps> = ({ result, isLoading, er
 
       <AnalysisCard title="Formatting Feedback" icon={<svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>}>
         <p>{result.formattingFeedback}</p>
-      {/* FIX: Corrected typo in closing tag from AanalysisCard to AnalysisCard */}
       </AnalysisCard>
     </div>
   );

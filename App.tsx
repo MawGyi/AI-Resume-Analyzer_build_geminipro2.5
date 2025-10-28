@@ -3,35 +3,199 @@ import React, { useState, useCallback } from 'react';
 import Header from './components/Header';
 import ResumeInput from './components/ResumeInput';
 import AnalysisDisplay from './components/AnalysisDisplay';
-import { analyzeResume } from './services/geminiService';
-import type { AnalysisResult } from './types';
+import JobDescriptionInput from './components/JobDescriptionInput';
+import MatchDisplay from './components/MatchDisplay';
+import Tabs from './components/Tabs';
+import SparklesIcon from './components/icons/SparklesIcon';
+import { analyzeResume, matchResumeToJob, rewriteBulletPoint, generateCoverLetter, parseResumeATS, generateInterviewQuestions, auditATSParsing } from './services/geminiService';
+import type { AnalysisResult, MatchResult, RewriteResult, CoverLetterResult, ATSResult, InterviewQuestionsResult, ATSAuditResult } from './types';
+import BulletPointInput from './components/BulletPointInput';
+import RewriteDisplay from './components/RewriteDisplay';
+import CoverLetterDisplay from './components/CoverLetterDisplay';
+import ATSDisplay from './components/ATSDisplay';
+import InterviewQuestionsDisplay from './components/InterviewQuestionsDisplay';
+
+type Mode = 'analysis' | 'match' | 'rewrite' | 'cover' | 'ats' | 'interview';
 
 const App: React.FC = () => {
+  const [mode, setMode] = useState<Mode>('analysis');
   const [resumeText, setResumeText] = useState<string>('');
+  const [jobDescriptionText, setJobDescriptionText] = useState<string>('');
+  const [bulletPointText, setBulletPointText] = useState<string>('');
+  const [missingKeywords, setMissingKeywords] = useState<string>('');
+  
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
+  const [rewriteResult, setRewriteResult] = useState<RewriteResult | null>(null);
+  const [coverLetterResult, setCoverLetterResult] = useState<CoverLetterResult | null>(null);
+  const [atsResult, setAtsResult] = useState<ATSResult | null>(null);
+  const [interviewQuestionsResult, setInterviewQuestionsResult] = useState<InterviewQuestionsResult | null>(null);
+  const [atsAuditResult, setAtsAuditResult] = useState<ATSAuditResult | null>(null);
+
+
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuditing, setIsAuditing] = useState<boolean>(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
-  const handleAnalyzeClick = useCallback(async () => {
-    if (!resumeText.trim()) {
-      setError('Please enter your resume text before analyzing.');
-      return;
-    }
+  const handleSetMode = (newMode: Mode) => {
+    // Clear all results and errors when switching modes for a clean slate
+    setAnalysisResult(null);
+    setMatchResult(null);
+    setRewriteResult(null);
+    setCoverLetterResult(null);
+    setAtsResult(null);
+    setInterviewQuestionsResult(null);
+    setAtsAuditResult(null);
+    setError(null);
+    setAuditError(null);
+    // Set the new mode
+    setMode(newMode);
+  };
 
-    setIsLoading(true);
+  const handleAction = useCallback(async () => {
+    // Reset state before new request
     setError(null);
     setAnalysisResult(null);
+    setMatchResult(null);
+    setRewriteResult(null);
+    setCoverLetterResult(null);
+    setAtsResult(null);
+    setInterviewQuestionsResult(null);
+    setAtsAuditResult(null);
+    setAuditError(null);
+    setIsLoading(true);
 
-    try {
-      const result = await analyzeResume(resumeText);
-      setAnalysisResult(result);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-      setError(`Analysis failed: ${errorMessage}`);
-    } finally {
-      setIsLoading(false);
+    if (mode === 'analysis' || mode === 'ats') {
+      if (!resumeText.trim()) {
+        setError('Please enter your resume text before analyzing.');
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        if (mode === 'analysis') {
+          const result = await analyzeResume(resumeText);
+          setAnalysisResult(result);
+        } else {
+          const result = await parseResumeATS(resumeText);
+          setAtsResult(result);
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        setError(`Analysis failed: ${errorMessage}`);
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (mode === 'match' || mode === 'cover' || mode === 'interview') {
+      if (!resumeText.trim() || !jobDescriptionText.trim()) {
+        setError('Please provide both a resume and a job description.');
+        setIsLoading(false);
+        return;
+      }
+      
+      try {
+        if (mode === 'match') {
+            const result = await matchResumeToJob(resumeText, jobDescriptionText);
+            setMatchResult(result);
+        } else if (mode === 'cover'){
+            const result = await generateCoverLetter(resumeText, jobDescriptionText);
+            setCoverLetterResult(result);
+        } else { // mode === 'interview'
+            const result = await generateInterviewQuestions(resumeText, jobDescriptionText);
+            setInterviewQuestionsResult(result);
+        }
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        setError(`Analysis failed: ${errorMessage}`);
+      } finally {
+        setIsLoading(false);
+      }
+    } else { // mode === 'rewrite'
+        if (!bulletPointText.trim()) {
+            setError('Please enter a bullet point to rewrite.');
+            setIsLoading(false);
+            return;
+        }
+        try {
+            const result = await rewriteBulletPoint(bulletPointText, missingKeywords);
+            setRewriteResult(result);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+            setError(`Rewrite failed: ${errorMessage}`);
+        } finally {
+            setIsLoading(false);
+        }
     }
-  }, [resumeText]);
+  }, [resumeText, jobDescriptionText, bulletPointText, missingKeywords, mode]);
+
+  const handleAudit = useCallback(async () => {
+    if (!atsResult) return;
+    
+    setAuditError(null);
+    setAtsAuditResult(null);
+    setIsAuditing(true);
+    
+    try {
+        const result = await auditATSParsing(atsResult);
+        setAtsAuditResult(result);
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+        setAuditError(`Audit failed: ${errorMessage}`);
+    } finally {
+        setIsAuditing(false);
+    }
+  }, [atsResult]);
+
+  const ActionButton = () => {
+    let buttonText = 'Analyze';
+    let isDisabled = isLoading;
+
+    if (mode === 'analysis') {
+        buttonText = 'Analyze Resume';
+        isDisabled = isLoading || !resumeText.trim();
+    } else if (mode === 'match') {
+        buttonText = 'Analyze Match';
+        isDisabled = isLoading || !resumeText.trim() || !jobDescriptionText.trim();
+    } else if (mode === 'cover') {
+        buttonText = 'Generate Cover Letter';
+        isDisabled = isLoading || !resumeText.trim() || !jobDescriptionText.trim();
+    } else if (mode === 'ats') {
+        buttonText = 'Parse for ATS';
+        isDisabled = isLoading || !resumeText.trim();
+    } else if (mode === 'interview') {
+        buttonText = 'Generate Questions';
+        isDisabled = isLoading || !resumeText.trim() || !jobDescriptionText.trim();
+    } else {
+        buttonText = 'Rewrite Bullet Point';
+        isDisabled = isLoading || !bulletPointText.trim();
+    }
+
+    return (
+      <div className="mt-8">
+        <button
+          onClick={handleAction}
+          disabled={isDisabled}
+          className="w-full inline-flex items-center justify-center gap-2 px-6 py-3 font-semibold text-white bg-blue-600 rounded-lg shadow-lg hover:bg-blue-500 disabled:bg-gray-600 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-blue-500 transition-all duration-300 transform hover:scale-105 disabled:scale-100"
+        >
+          {isLoading ? (
+            <>
+              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              Analyzing...
+            </>
+          ) : (
+            <>
+              <SparklesIcon className="w-5 h-5" />
+              {buttonText}
+            </>
+          )}
+        </button>
+      </div>
+    );
+  };
   
   return (
     <div className="min-h-screen bg-gray-900 text-white font-sans">
@@ -75,18 +239,64 @@ const App: React.FC = () => {
 
         <main className="container mx-auto px-4 py-8 md:py-12">
           <Header />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
-            <ResumeInput
-              resumeText={resumeText}
-              setResumeText={setResumeText}
-              onAnalyze={handleAnalyzeClick}
-              isLoading={isLoading}
-            />
-            <AnalysisDisplay
-              result={analysisResult}
-              isLoading={isLoading}
-              error={error}
-            />
+          <Tabs activeTab={mode} setActiveTab={handleSetMode} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="flex flex-col">
+              {mode === 'rewrite' ? (
+                 <BulletPointInput
+                    bulletPointText={bulletPointText}
+                    setBulletPointText={setBulletPointText}
+                    missingKeywords={missingKeywords}
+                    setMissingKeywords={setMissingKeywords}
+                    disabled={isLoading}
+                />
+              ) : (
+                <>
+                  <ResumeInput
+                    resumeText={resumeText}
+                    setResumeText={setResumeText}
+                    disabled={isLoading}
+                  />
+                  {(mode === 'match' || mode === 'cover' || mode === 'interview') && (
+                    <JobDescriptionInput
+                      jobDescriptionText={jobDescriptionText}
+                      setJobDescriptionText={setJobDescriptionText}
+                      disabled={isLoading}
+                    />
+                  )}
+                </>
+              )}
+              <ActionButton />
+            </div>
+
+            <div className="h-full">
+               {mode === 'analysis' && (
+                  <AnalysisDisplay result={analysisResult} isLoading={isLoading} error={error} />
+               )}
+               {mode === 'match' && (
+                  <MatchDisplay result={matchResult} isLoading={isLoading} error={error} />
+               )}
+               {mode === 'rewrite' && (
+                  <RewriteDisplay result={rewriteResult} isLoading={isLoading} error={error} />
+               )}
+               {mode === 'cover' && (
+                  <CoverLetterDisplay result={coverLetterResult} isLoading={isLoading} error={error} />
+               )}
+               {mode === 'ats' && (
+                  <ATSDisplay 
+                    result={atsResult} 
+                    isLoading={isLoading} 
+                    error={error} 
+                    onAudit={handleAudit}
+                    auditResult={atsAuditResult}
+                    isAuditing={isAuditing}
+                    auditError={auditError}
+                  />
+               )}
+               {mode === 'interview' && (
+                  <InterviewQuestionsDisplay result={interviewQuestionsResult} isLoading={isLoading} error={error} />
+               )}
+            </div>
           </div>
         </main>
       </div>

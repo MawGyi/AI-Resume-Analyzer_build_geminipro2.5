@@ -1,3 +1,4 @@
+
 import React from 'react';
 import SparklesIcon from './icons/SparklesIcon';
 
@@ -10,8 +11,8 @@ const Header: React.FC = () => {
           AI Resume Analyzer
         </h1>
       </div>
-      <p className="mt-4 max-w-2xl mx-auto text-lg text-gray-400">
-        Paste your resume below or upload a .txt, .md, or .pdf file. Our AI will provide instant feedback to help you stand out.
+      <p className="mt-4 max-w-3xl mx-auto text-lg text-gray-400">
+        Get AI-powered feedback on your resume, match it to a job, rewrite bullet points, generate a cover letter, see how an ATS parses it and audit the quality, or create custom interview questions.
       </p>
     </header>
   );
