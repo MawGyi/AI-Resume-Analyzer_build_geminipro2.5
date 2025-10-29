@@ -240,7 +240,8 @@ const App: React.FC = () => {
         <main className="container mx-auto px-4 py-8 md:py-12">
           <Header />
           <Tabs activeTab={mode} setActiveTab={handleSetMode} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="flex flex-col gap-8 mt-8">
+            {/* Input fields and action button are grouped together at the top */}
             <div className="flex flex-col">
               {mode === 'rewrite' ? (
                  <BulletPointInput
@@ -269,20 +270,34 @@ const App: React.FC = () => {
               <ActionButton />
             </div>
 
-            <div className="h-full">
-               {mode === 'analysis' && (
+            {/* Results display area appears below, separated by a divider */}
+            {/* This section only renders if there is a result, error, or loading state */}
+            {(isLoading || error || analysisResult || matchResult || rewriteResult || coverLetterResult || atsResult || interviewQuestionsResult) && (
+              <div>
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                    <div className="w-full border-t border-white/20" />
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-gray-900 px-4 text-lg font-medium text-gray-400">
+                      Results
+                    </span>
+                  </div>
+                </div>
+
+                {mode === 'analysis' && (
                   <AnalysisDisplay result={analysisResult} isLoading={isLoading} error={error} />
-               )}
-               {mode === 'match' && (
+                )}
+                {mode === 'match' && (
                   <MatchDisplay result={matchResult} isLoading={isLoading} error={error} />
-               )}
-               {mode === 'rewrite' && (
+                )}
+                {mode === 'rewrite' && (
                   <RewriteDisplay result={rewriteResult} isLoading={isLoading} error={error} />
-               )}
-               {mode === 'cover' && (
+                )}
+                {mode === 'cover' && (
                   <CoverLetterDisplay result={coverLetterResult} isLoading={isLoading} error={error} />
-               )}
-               {mode === 'ats' && (
+                )}
+                {mode === 'ats' && (
                   <ATSDisplay 
                     result={atsResult} 
                     isLoading={isLoading} 
@@ -292,11 +307,12 @@ const App: React.FC = () => {
                     isAuditing={isAuditing}
                     auditError={auditError}
                   />
-               )}
-               {mode === 'interview' && (
+                )}
+                {mode === 'interview' && (
                   <InterviewQuestionsDisplay result={interviewQuestionsResult} isLoading={isLoading} error={error} />
-               )}
-            </div>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>
