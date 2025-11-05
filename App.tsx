@@ -7,22 +7,63 @@ import JobDescriptionInput from './components/JobDescriptionInput';
 import MatchDisplay from './components/MatchDisplay';
 import Tabs from './components/Tabs';
 import SparklesIcon from './components/icons/SparklesIcon';
-import { analyzeResume, matchResumeToJob, rewriteBulletPoint, generateCoverLetter, parseResumeATS, generateInterviewQuestions, auditATSParsing } from './services/geminiService';
+import { 
+  analyzeResume, 
+  matchResumeToJob, 
+  rewriteBulletPoint, 
+  generateCoverLetter, 
+  parseResumeATS, 
+  generateInterviewQuestions, 
+  auditATSParsing,
+} from './services/geminiService';
 import type { AnalysisResult, MatchResult, RewriteResult, CoverLetterResult, ATSResult, InterviewQuestionsResult, ATSAuditResult } from './types';
 import BulletPointInput from './components/BulletPointInput';
 import RewriteDisplay from './components/RewriteDisplay';
 import CoverLetterDisplay from './components/CoverLetterDisplay';
 import ATSDisplay from './components/ATSDisplay';
 import InterviewQuestionsDisplay from './components/InterviewQuestionsDisplay';
+import useHistoryState from './hooks/useHistoryState';
 
 type Mode = 'analysis' | 'match' | 'rewrite' | 'cover' | 'ats' | 'interview';
 
 const App: React.FC = () => {
   const [mode, setMode] = useState<Mode>('analysis');
-  const [resumeText, setResumeText] = useState<string>('');
-  const [jobDescriptionText, setJobDescriptionText] = useState<string>('');
-  const [bulletPointText, setBulletPointText] = useState<string>('');
-  const [missingKeywords, setMissingKeywords] = useState<string>('');
+  
+  const {
+    value: resumeText,
+    setValue: setResumeText,
+    undo: undoResume,
+    redo: redoResume,
+    canUndo: canUndoResume,
+    canRedo: canRedoResume,
+  } = useHistoryState('');
+
+  const {
+      value: jobDescriptionText,
+      setValue: setJobDescriptionText,
+      undo: undoJobDescription,
+      redo: redoJobDescription,
+      canUndo: canUndoJobDescription,
+      canRedo: canRedoJobDescription,
+  } = useHistoryState('');
+
+  const {
+      value: bulletPointText,
+      setValue: setBulletPointText,
+      undo: undoBulletPoint,
+      redo: redoBulletPoint,
+      canUndo: canUndoBulletPoint,
+      canRedo: canRedoBulletPoint,
+  } = useHistoryState('');
+
+  const {
+      value: missingKeywords,
+      setValue: setMissingKeywords,
+      undo: undoMissingKeywords,
+      redo: redoMissingKeywords,
+      canUndo: canUndoMissingKeywords,
+      canRedo: canRedoMissingKeywords,
+  } = useHistoryState('');
   
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
@@ -32,14 +73,12 @@ const App: React.FC = () => {
   const [interviewQuestionsResult, setInterviewQuestionsResult] = useState<InterviewQuestionsResult | null>(null);
   const [atsAuditResult, setAtsAuditResult] = useState<ATSAuditResult | null>(null);
 
-
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuditing, setIsAuditing] = useState<boolean>(false);
   const [auditError, setAuditError] = useState<string | null>(null);
 
   const handleSetMode = (newMode: Mode) => {
-    // Clear all results and errors when switching modes for a clean slate
     setAnalysisResult(null);
     setMatchResult(null);
     setRewriteResult(null);
@@ -49,12 +88,10 @@ const App: React.FC = () => {
     setAtsAuditResult(null);
     setError(null);
     setAuditError(null);
-    // Set the new mode
     setMode(newMode);
   };
 
   const handleAction = useCallback(async () => {
-    // Reset state before new request
     setError(null);
     setAnalysisResult(null);
     setMatchResult(null);
@@ -66,66 +103,37 @@ const App: React.FC = () => {
     setAuditError(null);
     setIsLoading(true);
 
-    if (mode === 'analysis' || mode === 'ats') {
-      if (!resumeText.trim()) {
-        setError('Please enter your resume text before analyzing.');
-        setIsLoading(false);
-        return;
-      }
-
-      try {
-        if (mode === 'analysis') {
-          const result = await analyzeResume(resumeText);
-          setAnalysisResult(result);
-        } else {
-          const result = await parseResumeATS(resumeText);
-          setAtsResult(result);
-        }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(`Analysis failed: ${errorMessage}`);
-      } finally {
-        setIsLoading(false);
-      }
-    } else if (mode === 'match' || mode === 'cover' || mode === 'interview') {
-      if (!resumeText.trim() || !jobDescriptionText.trim()) {
-        setError('Please provide both a resume and a job description.');
-        setIsLoading(false);
-        return;
-      }
-      
-      try {
+    try {
+      if (mode === 'analysis') {
+        if (!resumeText.trim()) throw new Error('Please enter your resume text before analyzing.');
+        const result = await analyzeResume(resumeText);
+        setAnalysisResult(result);
+      } else if (mode === 'ats') {
+        if (!resumeText.trim()) throw new Error('Please enter your resume text before parsing.');
+        const result = await parseResumeATS(resumeText);
+        setAtsResult(result);
+      } else if (mode === 'match' || mode === 'cover' || mode === 'interview') {
+        if (!resumeText.trim() || !jobDescriptionText.trim()) throw new Error('Please provide both a resume and a job description.');
         if (mode === 'match') {
-            const result = await matchResumeToJob(resumeText, jobDescriptionText);
-            setMatchResult(result);
-        } else if (mode === 'cover'){
-            const result = await generateCoverLetter(resumeText, jobDescriptionText);
-            setCoverLetterResult(result);
+          const result = await matchResumeToJob(resumeText, jobDescriptionText);
+          setMatchResult(result);
+        } else if (mode === 'cover') {
+          const result = await generateCoverLetter(resumeText, jobDescriptionText);
+          setCoverLetterResult(result);
         } else { // mode === 'interview'
-            const result = await generateInterviewQuestions(resumeText, jobDescriptionText);
-            setInterviewQuestionsResult(result);
+          const result = await generateInterviewQuestions(resumeText, jobDescriptionText);
+          setInterviewQuestionsResult(result);
         }
-      } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-        setError(`Analysis failed: ${errorMessage}`);
-      } finally {
-        setIsLoading(false);
+      } else { // mode === 'rewrite'
+        if (!bulletPointText.trim()) throw new Error('Please enter a bullet point to rewrite.');
+        const result = await rewriteBulletPoint(bulletPointText, missingKeywords);
+        setRewriteResult(result);
       }
-    } else { // mode === 'rewrite'
-        if (!bulletPointText.trim()) {
-            setError('Please enter a bullet point to rewrite.');
-            setIsLoading(false);
-            return;
-        }
-        try {
-            const result = await rewriteBulletPoint(bulletPointText, missingKeywords);
-            setRewriteResult(result);
-        } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
-            setError(`Rewrite failed: ${errorMessage}`);
-        } finally {
-            setIsLoading(false);
-        }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred.';
+      setError(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   }, [resumeText, jobDescriptionText, bulletPointText, missingKeywords, mode]);
 
@@ -151,25 +159,12 @@ const App: React.FC = () => {
     let buttonText = 'Analyze';
     let isDisabled = isLoading;
 
-    if (mode === 'analysis') {
-        buttonText = 'Analyze Resume';
-        isDisabled = isLoading || !resumeText.trim();
-    } else if (mode === 'match') {
-        buttonText = 'Analyze Match';
-        isDisabled = isLoading || !resumeText.trim() || !jobDescriptionText.trim();
-    } else if (mode === 'cover') {
-        buttonText = 'Generate Cover Letter';
-        isDisabled = isLoading || !resumeText.trim() || !jobDescriptionText.trim();
-    } else if (mode === 'ats') {
-        buttonText = 'Parse for ATS';
-        isDisabled = isLoading || !resumeText.trim();
-    } else if (mode === 'interview') {
-        buttonText = 'Generate Questions';
-        isDisabled = isLoading || !resumeText.trim() || !jobDescriptionText.trim();
-    } else {
-        buttonText = 'Rewrite Bullet Point';
-        isDisabled = isLoading || !bulletPointText.trim();
-    }
+    if (mode === 'analysis') buttonText = 'Analyze Resume';
+    else if (mode === 'match') buttonText = 'Analyze Match';
+    else if (mode === 'cover') buttonText = 'Generate Cover Letter';
+    else if (mode === 'ats') buttonText = 'Parse for ATS';
+    else if (mode === 'interview') buttonText = 'Generate Questions';
+    else buttonText = 'Rewrite Bullet Point';
 
     return (
       <div className="mt-8">
@@ -241,7 +236,6 @@ const App: React.FC = () => {
           <Header />
           <Tabs activeTab={mode} setActiveTab={handleSetMode} />
           <div className="flex flex-col gap-8 mt-8">
-            {/* Input fields and action button are grouped together at the top */}
             <div className="flex flex-col">
               {mode === 'rewrite' ? (
                  <BulletPointInput
@@ -250,6 +244,14 @@ const App: React.FC = () => {
                     missingKeywords={missingKeywords}
                     setMissingKeywords={setMissingKeywords}
                     disabled={isLoading}
+                    undoBulletPoint={undoBulletPoint}
+                    redoBulletPoint={redoBulletPoint}
+                    canUndoBulletPoint={canUndoBulletPoint}
+                    canRedoBulletPoint={canRedoBulletPoint}
+                    undoMissingKeywords={undoMissingKeywords}
+                    redoMissingKeywords={redoMissingKeywords}
+                    canUndoMissingKeywords={canUndoMissingKeywords}
+                    canRedoMissingKeywords={canRedoMissingKeywords}
                 />
               ) : (
                 <>
@@ -257,12 +259,20 @@ const App: React.FC = () => {
                     resumeText={resumeText}
                     setResumeText={setResumeText}
                     disabled={isLoading}
+                    undo={undoResume}
+                    redo={redoResume}
+                    canUndo={canUndoResume}
+                    canRedo={canRedoResume}
                   />
                   {(mode === 'match' || mode === 'cover' || mode === 'interview') && (
                     <JobDescriptionInput
                       jobDescriptionText={jobDescriptionText}
                       setJobDescriptionText={setJobDescriptionText}
                       disabled={isLoading}
+                      undo={undoJobDescription}
+                      redo={redoJobDescription}
+                      canUndo={canUndoJobDescription}
+                      canRedo={canRedoJobDescription}
                     />
                   )}
                 </>
@@ -270,8 +280,6 @@ const App: React.FC = () => {
               <ActionButton />
             </div>
 
-            {/* Results display area appears below, separated by a divider */}
-            {/* This section only renders if there is a result, error, or loading state */}
             {(isLoading || error || analysisResult || matchResult || rewriteResult || coverLetterResult || atsResult || interviewQuestionsResult) && (
               <div>
                 <div className="relative my-4">

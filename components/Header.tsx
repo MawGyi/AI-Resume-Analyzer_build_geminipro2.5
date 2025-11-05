@@ -4,7 +4,7 @@ import SparklesIcon from './icons/SparklesIcon';
 
 const Header: React.FC = () => {
   return (
-    <header className="text-center">
+    <header className="text-center relative">
       <div className="inline-flex items-center gap-3 bg-gray-800/50 rounded-full px-4 py-2 border border-white/10">
         <SparklesIcon className="w-6 h-6 text-blue-400" />
         <h1 className="text-2xl md:text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-indigo-400 text-transparent bg-clip-text">

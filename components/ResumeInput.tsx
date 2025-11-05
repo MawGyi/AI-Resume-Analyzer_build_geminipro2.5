@@ -2,6 +2,8 @@
 import React, { useRef, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist/build/pdf.mjs';
 import UploadIcon from './icons/UploadIcon';
+import UndoIcon from './icons/UndoIcon';
+import RedoIcon from './icons/RedoIcon';
 
 // Use a stable, versioned CDN for the worker script
 const PDF_WORKER_URL = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.worker.mjs';
@@ -12,9 +14,13 @@ interface ResumeInputProps {
   resumeText: string;
   setResumeText: (text: string) => void;
   disabled: boolean;
+  undo: () => void;
+  redo: () => void;
+  canUndo: boolean;
+  canRedo: boolean;
 }
 
-const ResumeInput: React.FC<ResumeInputProps> = ({ resumeText, setResumeText, disabled }) => {
+const ResumeInput: React.FC<ResumeInputProps> = ({ resumeText, setResumeText, disabled, undo, redo, canUndo, canRedo }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [isReadingFile, setIsReadingFile] = useState<boolean>(false);
@@ -101,7 +107,24 @@ const ResumeInput: React.FC<ResumeInputProps> = ({ resumeText, setResumeText, di
         <label htmlFor="resume-text" className="text-lg font-semibold text-gray-200">
           Your Resume
         </label>
-        <div>
+        <div className="flex items-center gap-2">
+           <button
+              onClick={undo}
+              disabled={!canUndo || isDisabled}
+              className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+              aria-label="Undo"
+          >
+              <UndoIcon className="w-5 h-5" />
+          </button>
+          <button
+              onClick={redo}
+              disabled={!canRedo || isDisabled}
+              className="p-1.5 rounded-md text-gray-400 hover:text-white hover:bg-white/10 disabled:text-gray-600 disabled:bg-transparent disabled:cursor-not-allowed transition-colors"
+              aria-label="Redo"
+          >
+              <RedoIcon className="w-5 h-5" />
+          </button>
+          <div className="w-px h-5 bg-white/20 mx-1"></div>
           <input
             type="file"
             ref={fileInputRef}
